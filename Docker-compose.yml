@@ -1,0 +1,29 @@
+version: '3'
+services:
+  backend:
+    build: .
+    container_name: node-container
+    ports:
+      - 4000:4000
+    depends_on:
+      - mongo_db
+    environment:
+      PORT: 4000
+      MONGODB_URI: mongodb://mongo_db:27017
+      DB_NAME: blogdb
+      ACCESS_TOKEN_SECRET_KEY: blogwebappsecret
+      ACCESS_TOKEN_EXPIRY: 1d  
+      CLOUDINARY_CLOUD_NAME: webappbucket
+      CLOUDINARY_API_KEY: 479575748892839
+      CLOUDINARY_API_SECRET: l9gCpwPr3La-3XbUc1ZSn1iF2xw
+      
+  mongo_db:
+    image: mongo:latest
+    container_name: database-container
+    ports:
+      - 27017:27017
+    volumes:
+      - mongo-data:/data/db  
+
+volumes:
+  mongo-data:
