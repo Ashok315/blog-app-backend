@@ -3,8 +3,6 @@ services:
   backend:
     build: .
     container_name: node-container
-    volumes:
-      - .:/backend-app 
     ports:
       - 4000:4000
     depends_on:
@@ -18,7 +16,6 @@ services:
       CLOUDINARY_CLOUD_NAME: webappbucket
       CLOUDINARY_API_KEY: 479575748892839
       CLOUDINARY_API_SECRET: l9gCpwPr3La-3XbUc1ZSn1iF2xw
-    command: npm start
       
   mongo_db:
     image: mongo:latest
