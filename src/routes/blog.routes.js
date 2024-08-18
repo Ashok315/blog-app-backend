@@ -6,7 +6,7 @@ import { upload } from "../middlewares/multer.middleware.js";
 const router=Router();
 
 //api/blogs/
-router.get('/test',(req,res)=>res.send("test message2"))
+router.get('/test',(req,res)=>res.send("test message3"))
 router.post('/create-blog', authMiddleware, upload.single('feature_image'),createBlog)
 router.get('/get-blogs',getBlogs);
 router.get('/get-blogs/:blogId',getBlogById);
