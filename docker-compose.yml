@@ -2,7 +2,7 @@ version: '3'
 services:
   backend:
     build: .
-    container_name: node-container
+    container_name: backend-container
     ports:
       - 4000:4000
     depends_on:
