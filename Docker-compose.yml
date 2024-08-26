@@ -13,7 +13,6 @@ services:
       DB_NAME: blogdb
       ACCESS_TOKEN_SECRET_KEY: blogwebappsecret
       ACCESS_TOKEN_EXPIRY: 1d  
-      PROD_ORIGIN: http://34.93.216.160
       CLOUDINARY_CLOUD_NAME: webappbucket
       CLOUDINARY_API_KEY: 479575748892839
       CLOUDINARY_API_SECRET: l9gCpwPr3La-3XbUc1ZSn1iF2xw
