@@ -25,7 +25,7 @@ const blogSchema=new Schema({
    },
    feature_image:{
     type:String,
-    default:"https://img.freepik.com/free-vector/blogging-fun-content-creation-online-streaming-video-blog-young-girl-making-selfie-social-network-sharing-feedback-self-promotion-strategy-vector-isolated-concept-metaphor-illustration_335657-855.jpg?w=740&t=st=1710127262~exp=1710127862~hmac=b45fb4a26446c5e8a7821675518c8708a0fad436c7ecf1e55668f2b813d9febe"
+    default:"https://res.cloudinary.com/webappbucket/image/upload/v1725001468/myblog/images/blogDefault_rk3yod.png"
    },
    visibility:{
     type:String,

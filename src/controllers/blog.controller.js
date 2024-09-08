@@ -1,5 +1,9 @@
 import { Blog } from "../models/blog.model.js";
 import { uploadOnCloudinary } from "../services/cloudinary.service.js";
+import NodeCache from "node-cache";
+import { upload } from "../middlewares/multer.middleware.js";
+
+const nodeCache=new NodeCache();
 
 
 //create blog
@@ -9,7 +13,9 @@ const createBlog=async (req,res)=>{
         const {title,category,content,visibility}=req.body;
 
         if(!title || !content){
-            return res.status(400).json({ error: 'Title and content are required' });
+            return res.status(400).json({
+                 statusCode:400,
+                 message:'Title and content are required' });
         }
 
         const slug= title
@@ -20,21 +26,24 @@ const createBlog=async (req,res)=>{
                         .replace(/\s+/g, '-') // Replace spaces with dashes
                         .replace(/-+/g, '-'); // Replace multiple dashes with a single dash
         
-        
+                      
         const feature_image_local_path=req.file?.path;
         let feature_image;
 
         if(feature_image_local_path){
+
             feature_image=await uploadOnCloudinary(feature_image_local_path);
+
+            if(!feature_image){
+                return res.status(400).json({
+                    statusCode:400,
+                    message:"File was not uploaded"
+                })
+            }
         }
 
-        if(!feature_image){
-            return res.status(400).json({
-                statusCode:400,
-                message:"File was not uploaded"
-            })
-        }
-            
+    
+         
         const blog=new Blog({
             author:req.user._id,
             title,
@@ -46,6 +55,7 @@ const createBlog=async (req,res)=>{
         })
     
         await blog.save();
+        nodeCache.del('blogs');
        
         return res.status(201).json({
             statusCode:201,
@@ -65,8 +75,23 @@ const createBlog=async (req,res)=>{
 const getBlogs=async (req,res)=>{
     
     try {
-        // const blogs=await Blog.find(req.query).populate("author","-password");
-        const blogs=await Blog.find(req.query).populate('author','-password').populate({path:'comments.commentedBy',select:['image','firstName','lastName','createdAt']});
+        let blogs;
+           
+        if(nodeCache.has("blogs")){
+            if(Object.keys(req.query).length!=0){      
+                blogs=await Blog.find(req.query).populate('author','-password').populate({path:'comments.commentedBy',select:['image','firstName','lastName','createdAt']});
+
+            }
+            else{
+                blogs=JSON.parse(nodeCache.get("blogs"));   
+            }
+                     
+        }
+        else{
+            blogs=await Blog.find(req.query).populate('author','-password').populate({path:'comments.commentedBy',select:['image','firstName','lastName','createdAt']});
+            nodeCache.set("blogs",JSON.stringify(blogs));
+        }
+        
         return res.status(200).json({
             statusCode:200,
             blogs
@@ -141,7 +166,10 @@ const updateBlog=async (req,res)=>{
             feature_image,
             status
            } 
-        },{new:true})
+        },{new:true});
+
+        nodeCache.del('blogs');
+
         return res.status(200).json({
             statusCode:200,
             message:"Blog updated successfully",
@@ -162,6 +190,8 @@ const deleteBlog=async(req,res)=>{
     try {
         const blogId=req.params.blogId;
         await Blog.findByIdAndDelete(blogId);
+        nodeCache.del('blogs');
+
         return res.status(200).json({
             statusCode:200,
             message:"Blog deleted successfully"
