@@ -2,6 +2,9 @@ import {User} from '../models/user.model.js'
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import { uploadOnCloudinary } from '../services/cloudinary.service.js';
+import NodeCache from 'node-cache';
+
+const nodeCache=new NodeCache();
 
 const registerUser=async (req,res)=>{
 
@@ -171,6 +174,8 @@ const updateProfile=async (req,res)=>{
             }
         },{new:true}).select("-password")
 
+        nodeCache.del('blogs');
+
        return res.status(200).json({
               statusCode:200,
               message:"Profile data updated successfully",
@@ -211,6 +216,7 @@ const updateProfileImage=async(req,res)=>{
             }
         },{new:true}).select("-password")
 
+        nodeCache.del('blogs');
 
         return res.status(200).json({
             statusCode:200,
