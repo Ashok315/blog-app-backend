@@ -1,10 +1,7 @@
+import mongoose from "mongoose";
 import { Blog } from "../models/blog.model.js";
 import { uploadOnCloudinary } from "../services/cloudinary.service.js";
-import NodeCache from "node-cache";
-import { upload } from "../middlewares/multer.middleware.js";
-
-const nodeCache=new NodeCache();
-
+import { cache } from "../utils/cache.js";
 
 //create blog
 const createBlog=async (req,res)=>{
@@ -42,8 +39,6 @@ const createBlog=async (req,res)=>{
             }
         }
 
-    
-         
         const blog=new Blog({
             author:req.user._id,
             title,
@@ -55,7 +50,7 @@ const createBlog=async (req,res)=>{
         })
     
         await blog.save();
-        nodeCache.del('blogs');
+        cache.flushAll();
        
         return res.status(201).json({
             statusCode:201,
@@ -72,54 +67,141 @@ const createBlog=async (req,res)=>{
 }
 
 //get all blogs
-const getBlogs=async (req,res)=>{
-    
-    try {
-        let blogs;
-           
-        if(nodeCache.has("blogs")){
-            if(Object.keys(req.query).length!=0){      
-                blogs=await Blog.find(req.query).populate('author','-password').populate({path:'comments.commentedBy',select:['image','firstName','lastName','createdAt']});
 
-            }
-            else{
-                blogs=JSON.parse(nodeCache.get("blogs"));   
-            }
-                     
+const getBlogs = async (req, res) => {
+    try {
+
+        let queryParams=req.query;
+        let cacheKey;
+
+        //set cackeKey value when query parameter has default value
+        if(Object.keys(queryParams).length!=0){   
+            cacheKey = Object.values(queryParams)[0];
         }
         else{
-            blogs=await Blog.find(req.query).populate('author','-password').populate({path:'comments.commentedBy',select:['image','firstName','lastName','createdAt']});
-            nodeCache.set("blogs",JSON.stringify(blogs));
+            cacheKey ="all";
         }
+     
+        // Check if the data is already in the cache
+        let cachedBlogs = cache.get(cacheKey);
+
+        if (cachedBlogs) {
+            return res.status(200).json({
+                statusCode: 200,
+                blogs: JSON.parse(cachedBlogs),
+                message: 'Fetched from cache'
+            });
+        }
+        else{
+
+            // check query parameter value is valid or not 
+           let validAuthorId=(queryParams.hasOwnProperty('author')&&!mongoose.Types.ObjectId.isValid(queryParams.author));
+           let validBlogId=(queryParams.hasOwnProperty('_id')&&!mongoose.Types.ObjectId.isValid(queryParams._id));
+           
+            if(validAuthorId||validBlogId){
+                return res.status(400).json({
+                    statusCode:400,
+                    message:"Invalid parameter value"
+                });
+            }
+                const blogs = await Blog.find(queryParams)
+                                .populate('author', '-password')
+                                .populate({
+                                    path: 'comments.commentedBy',
+                                    select: ['image', 'firstName', 'lastName', 'createdAt']
+                                });
+
+                if(blogs.length==0){
+                    return res.status(404).json({
+                        statusCode:404,
+                        message:"Data not found"
+                    })
+                }
         
-        return res.status(200).json({
-            statusCode:200,
-            blogs
-        })
+                // Store the result in the cache
+                cache.set(cacheKey, JSON.stringify(blogs));
+            
+                return res.status(200).json({
+                    statusCode: 200,
+                    blogs,
+                    message: 'Fetched from database'
+                });                                                     
+        }
+
+    
     } catch (error) {
-       return res.status(500).json({
-        statusCode:500,
-        message:error.message
-    })
+        return res.status(500).json({
+            statusCode: 500,
+            message: error.message
+        });
+    }
+};
+
+const getLatestBlogs=async (req,res)=>{
+    try{
+
+        // Check if the data is already in the cache
+        let cachedBlogs=cache.get("latest-blogs");
+
+        if(cachedBlogs){
+            return res.status(200).json({
+                statusCode: 200,
+                blogs:JSON.parse(cachedBlogs),
+                message: 'Fetched from cache'   
+            });
+        }
+
+        const blogs=await Blog.find({})
+            .populate('author', '-password')
+            .populate({
+                path: 'comments.commentedBy',
+                select: ['image', 'firstName', 'lastName', 'createdAt']
+            })
+            .sort({createdAt:-1})
+            .limit(6);
+           
+            //Store the data in cache
+            cache.set("latest-blogs",JSON.stringify(blogs));
+
+            return res.status(200).json({
+                statusCode:200,
+                blogs,
+                message:"fetch latest from database"
+            });
+
+
+    }catch(error){
+        return res.status(500).json({
+            statusCode: 500,
+            message: error.message
+        });
     }
 
 }
+//get blog by slug
+const getBlogBySlug=async (req,res)=>{
+    try {
 
-const getBlogById=async (req,res)=>{
-     try {
-        const id=req.params.blogId
-        const blog=await Blog.findById(id).populate("author","-password");
-        return res.status(200).json({
-            statusCode:200,
-            blog
-        })
-        
-     } catch (error) {  
-        return res.status(500).json({
-            statusCode:500,
-            message:error.message
-        })
-     }
+       const blog=await Blog.find({ slug: req.params.slug }).populate("author","-password").populate({path:'comments.commentedBy',select:['image','firstName','lastName','createdAt']});
+      
+       if(blog.length==0){
+          return res.status(400).json({
+            statusCode:400,
+            message:"Bad Request"
+          })
+       }
+
+       return res.status(200).json({
+           statusCode:200,
+           blog
+       })
+       
+    } catch (error) {  
+       return res.status(500).json({
+           statusCode:500,
+           message:error.message
+       })
+    }
 }
 
 //update blog
@@ -148,13 +230,14 @@ const updateBlog=async (req,res)=>{
 
         if(feature_image_local_path){
             feature_image=await uploadOnCloudinary(feature_image_local_path);
+            if(!feature_image){
+                return res.status(400).json({
+                    statusCode:400,
+                    message:"File was not uploaded"
+                })
+            }
         }
-        if(!feature_image){
-            return res.status(400).json({
-                statusCode:400,
-                message:"File was not uploaded"
-            })
-        }
+     
 
         const updatedBlog=await Blog.findByIdAndUpdate(blogId,{
            $set:{
@@ -168,7 +251,7 @@ const updateBlog=async (req,res)=>{
            } 
         },{new:true});
 
-        nodeCache.del('blogs');
+        cache.flushAll();
 
         return res.status(200).json({
             statusCode:200,
@@ -190,7 +273,7 @@ const deleteBlog=async(req,res)=>{
     try {
         const blogId=req.params.blogId;
         await Blog.findByIdAndDelete(blogId);
-        nodeCache.del('blogs');
+        cache.flushAll();
 
         return res.status(200).json({
             statusCode:200,
@@ -269,7 +352,7 @@ const addComment=async (req,res)=>{
 
 
 
-export {createBlog,getBlogs,getBlogById,updateBlog,deleteBlog,likeBlog,addComment}
+export {createBlog,getBlogs,getBlogBySlug,updateBlog,deleteBlog,likeBlog,addComment,getLatestBlogs}
 
 
 

@@ -2,9 +2,7 @@ import {User} from '../models/user.model.js'
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import { uploadOnCloudinary } from '../services/cloudinary.service.js';
-import NodeCache from 'node-cache';
-
-const nodeCache=new NodeCache();
+import { cache } from '../utils/cache.js';
 
 const registerUser=async (req,res)=>{
 
@@ -174,7 +172,7 @@ const updateProfile=async (req,res)=>{
             }
         },{new:true}).select("-password")
 
-        nodeCache.del('blogs');
+        cache.flushAll();
 
        return res.status(200).json({
               statusCode:200,
@@ -195,6 +193,7 @@ const updateProfile=async (req,res)=>{
 const updateProfileImage=async(req,res)=>{
 
     try{
+
         const userId=req.params.userId
         const image_local_path=req.file?.path
         let profileImage;
@@ -214,10 +213,10 @@ const updateProfileImage=async(req,res)=>{
             $set:{
                 image:profileImage
             }
-        },{new:true}).select("-password")
+        },{new:true}).select("-password");
 
-        nodeCache.del('blogs');
-
+        cache.flushAll();
+       
         return res.status(200).json({
             statusCode:200,
             message:"Profile Image updated successfully",
