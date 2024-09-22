@@ -12,11 +12,13 @@ app.use(express.urlencoded({extended:true}));
 app.use(express.static("../public"));
 app.use(cookieParser())
 app.use(cors({origin:[process.env.DEV_ORIGIN, process.env.PROD_ORIGIN],credentials:true}));
+app.use(compression());
 
 
 //import routes
 import userRoutes from '../src/routes/user.routes.js'
 import blogRoutes from '../src/routes/blog.routes.js';
+import compression from "compression";
 
 app.use('/api/users',userRoutes);
 app.use('/api/blogs',blogRoutes);
