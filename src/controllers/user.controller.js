@@ -4,137 +4,155 @@ import jwt from 'jsonwebtoken'
 import { uploadOnCloudinary } from '../services/cloudinary.service.js';
 import { cache } from '../utils/cache.js';
 
+// sign-up user
 const registerUser=async (req,res)=>{
+    try {
+        const {firstName,lastName,email,password}=req.body;
+        // check input validation    
+        if([firstName,lastName,email,password].some((field)=>field.trim()==='')){
+                return res.status(400).json({
+                    statusCode:400,
+                    message:`all fields are required`
+                })
+            }
 
-  const {firstName,lastName,email,password}=req.body;
-
-  if(
-    [firstName,lastName,email,password].some((field)=>field.trim()==='')
-    ){
-        return res.status(400).json({
-            statusCode:400,
-            message:`all fields are required`
-        })
-    }
-
-    const existedUser= await User.findOne({email});
-
-    if(existedUser){
+        // check if user email already exist
+        const existedUser= await User.findOne({email});
+        if(existedUser){    
+            return res.status(409).json({
+                statusCode:409,
+                message:'User with email already exist'
+            })
+        }
         
-        return res.status(409).json({
-            statusCode:409,
-            message:'User with email already exist'
+        // increapt password
+        const hashPassword= await bcrypt.hash(password,10)
+
+        const user=new User({
+            firstName,
+            lastName,
+            email,
+            password:hashPassword
+        })
+        
+        // store user data in database
+        await user.save()
+
+        // check user data store or not
+        const createdUser= await User.findById(user._id).select("-password")
+        if(!createdUser){
+            return res.status(500).json({statusCode:500,message:"something went wrong while register"})
+        }
+              
+        return res.status(201).json({
+            success:true,
+            statusCode:201,
+            message:"User Registered successfully",
+            data:createdUser
+        });
+        
+    } catch (error) {
+        return res.status(500).json({
+            statusCode:500,
+            message:error.message
         })
     }
 
-    const hashPassword= await bcrypt.hash(password,10)
-
-  try {
-    const user=new User({
-        firstName,
-        lastName,
-        email,
-        password:hashPassword
-      })
-     
-      await user.save()
-
-      const createdUser= await User.findById(user._id).select("-password")
-
-      if(!createdUser){
-        return res.status(500).json({statusCode:500,message:"something went wrong while register"})
-      }
-    
-      
-      return res.status(201).json({
-        success:true,
-        statusCode:201,
-        message:"User Registered successfully",
-        data:createdUser
-    });
-    
-  } catch (error) {
-    return res.status(500).json({
-        statusCode:500,
-        message:error.message
-    })
-  }
-
-
 }
 
+// sign-in user
 const loginUser=async (req, res)=>{
-const {email,password}=req.body;
-
-if([email,password].some((field)=>field.trim()==="")){
-    return res.status(400).json({
-        statusCode:400,
-        message:"email or password is required"
-    })
-}
-
-const existUser=await User.findOne({email});
-if(!existUser){
-    return res.status(400).json({
-        statusCode:404,
-        message:"User does not exist"
-    })
-}
-const isPasswordCorrect=await bcrypt.compare(password,existUser.password)
-
-if(!isPasswordCorrect){
-    return res.status(400).json({
-        statusCode:400,
-        message:"Invalid password"
-    })
-}
-
+    try {
+        const {email,password}=req.body; 
+        // check input validation
+        if([email,password].some((field)=>field.trim()==="")){
+            return res.status(400).json({
+                statusCode:400,
+                message:"email or password is required"
+            })
+        }
+        
+        // check user exist or not
+        const existUser=await User.findOne({email});
+        if(!existUser){
+            return res.status(400).json({
+                statusCode:404,
+                message:"User does not exist"
+            })
+        }
     
-const userData={
-    id:existUser._id,
-    email:existUser.email,
-    name:`${existUser.firstName} ${existUser.lastName}`
-}
-const accessToken=jwt.sign(userData,process.env.ACCESS_TOKEN_SECRET_KEY,{expiresIn:process.env.ACCESS_TOKEN_EXPIRY});
-
-const options={
-   httpOnly:true,
-   secure:true,
-   sameSite: 'None',
-   maxAge: 24*60*60*1000, // 24hr
-}
-
-return res
-  .status(200)
-  .cookie('accessToken',accessToken,options)
-  .json({
-      statusCode:200,
-      accessToken,
-      message:"User logged In successfully",
- })
-
-}
-
-const logoutUser=async (req,res)=>{
-    const options={
+        //check user password is correct or not 
+        const isPasswordCorrect=await bcrypt.compare(password,existUser.password)
+        if(!isPasswordCorrect){
+            return res.status(400).json({
+                statusCode:400,
+                message:"Invalid password"
+            })
+        }
+          
+        // send access token
+        const userData={
+            id:existUser._id,
+            email:existUser.email,
+            name:`${existUser.firstName} ${existUser.lastName}`
+        }
+        const accessToken=jwt.sign(userData,process.env.ACCESS_TOKEN_SECRET_KEY,{expiresIn:process.env.ACCESS_TOKEN_EXPIRY});
+    
+        const options={
         httpOnly:true,
         secure:true,
-        sameSite: 'None'
-        
+        sameSite: 'None',
+        maxAge: 24*60*60*1000, // 24hr
+        }
+    
+        return res
+        .status(200)
+        .cookie('accessToken',accessToken,options)
+        .json({
+            statusCode:200,
+            accessToken,
+            message:"User logged In successfully",
+        })
+
+    } catch (error) {
+        return res.status(500).json({
+            statusCode:500,
+            message:error.message
+        })
     }
-  return res.status(200)
-            .clearCookie("accessToken",options)
-            .json({
-                statusCode:200,
-                message:"User logged Out successfully"
-            })
+   
+}
+
+// logout user
+const logoutUser=async (req,res)=>{
+    try {
+        const options={
+            httpOnly:true,
+            secure:true,
+            sameSite: 'None'      
+        }
+        
+        return res.status(200)
+                .clearCookie("accessToken",options)
+                .json({
+                    statusCode:200,
+                    message:"User logged Out successfully"
+                })
+    } catch (error) {
+        return res.status(500).json({
+            statusCode:500,
+            message:error.message
+        })
+    }
  
 }
 
-const getCurrentUser=async (req,res)=>{
-    const userId=req.user._id;
+// get current user
+const getCurrentUser=async (req,res)=>{   
     try {
+        const userId=req.user._id;
         const userData=await User.findById(userId,"-password");
+        // check user is available or not
         if(!userData){
             return res.status(400).json({
                 statusCode:400,
@@ -153,18 +171,20 @@ const getCurrentUser=async (req,res)=>{
     }
 }
 
+// update user profile data
 const updateProfile=async (req,res)=>{
     try{
         const userId=req.params.userId;
         const {firstName,lastName}=req.body;
-
+        // check input validation
         if(!firstName.trim()||!lastName.trim()){
             return res.status(400).json({
                 statusCode:400,
                 message:"all field are required"
             })
         }
-
+        
+        // update user data
         const updatedUser=await User.findByIdAndUpdate(userId,{
             $set:{
                 firstName:firstName,
@@ -172,13 +192,14 @@ const updateProfile=async (req,res)=>{
             }
         },{new:true}).select("-password")
 
+        // clear all cache
         cache.flushAll();
 
-       return res.status(200).json({
-              statusCode:200,
-              message:"Profile data updated successfully",
-              updatedUser
-       })
+        return res.status(200).json({
+                statusCode:200,
+                message:"Profile data updated successfully",
+                updatedUser
+        })
     }
     catch(error){
       return  res.status(500).json({
@@ -190,31 +211,33 @@ const updateProfile=async (req,res)=>{
 
 }
 
+// update user profile image
 const updateProfileImage=async(req,res)=>{
-
     try{
-
         const userId=req.params.userId
         const image_local_path=req.file?.path
         let profileImage;
         
+        // upload image on cloudinary
         if(image_local_path){
             profileImage=await uploadOnCloudinary(image_local_path);
-        }
-        
-        if(!profileImage){
-            return res.status(400).json({
-                statusCode:400,
-                message:"File was not uploaded"
-            })
-        }
 
+            if(!profileImage){
+                return res.status(400).json({
+                    statusCode:400,
+                    message:"File was not uploaded"
+                })
+            }
+        }
+          
+        // update user profile image
         const updatedUser=await User.findByIdAndUpdate(userId,{
             $set:{
                 image:profileImage
             }
         },{new:true}).select("-password");
 
+        // clear all cache
         cache.flushAll();
        
         return res.status(200).json({
@@ -229,9 +252,7 @@ const updateProfileImage=async(req,res)=>{
             statusCode:500,
             message:error.message
         })
-
     }
-
 }
 
 export {registerUser,loginUser,logoutUser,getCurrentUser,updateProfile,updateProfileImage}
