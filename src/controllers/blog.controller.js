@@ -5,10 +5,10 @@ import { cache } from "../utils/cache.js";
 
 //create blog
 const createBlog=async (req,res)=>{
-
     try {    
         const {title,category,content,visibility}=req.body;
 
+        // check input validation
         if(!title || !content){
             return res.status(400).json({
                  statusCode:400,
@@ -27,8 +27,8 @@ const createBlog=async (req,res)=>{
         const feature_image_local_path=req.file?.path;
         let feature_image;
 
+        // upload blog image on cloudinary
         if(feature_image_local_path){
-
             feature_image=await uploadOnCloudinary(feature_image_local_path);
 
             if(!feature_image){
@@ -48,8 +48,11 @@ const createBlog=async (req,res)=>{
             feature_image,
             visibility
         })
-    
+        
+        //store blog data in database
         await blog.save();
+        
+        // clear all cache
         cache.flushAll();
        
         return res.status(201).json({
@@ -67,7 +70,6 @@ const createBlog=async (req,res)=>{
 }
 
 //get all blogs
-
 const getBlogs = async (req, res) => {
     try {
 
@@ -104,28 +106,29 @@ const getBlogs = async (req, res) => {
                     message:"Invalid parameter value"
                 });
             }
-                const blogs = await Blog.find(queryParams)
-                                .populate('author', '-password')
-                                .populate({
-                                    path: 'comments.commentedBy',
-                                    select: ['image', 'firstName', 'lastName', 'createdAt']
-                                });
 
-                if(blogs.length==0){
-                    return res.status(404).json({
-                        statusCode:404,
-                        message:"Data not found"
-                    })
-                }
+            const blogs = await Blog.find(queryParams)
+                            .populate('author', '-password')
+                            .populate({
+                                path: 'comments.commentedBy',
+                                select: ['image', 'firstName', 'lastName', 'createdAt']
+                            });
+
+            if(blogs.length==0){
+                return res.status(404).json({
+                    statusCode:404,
+                    message:"Data not found"
+                })
+            }
+    
+            // Store the result in the cache
+            cache.set(cacheKey, JSON.stringify(blogs));
         
-                // Store the result in the cache
-                cache.set(cacheKey, JSON.stringify(blogs));
-            
-                return res.status(200).json({
-                    statusCode: 200,
-                    blogs,
-                    message: 'Fetched from database'
-                });                                                     
+            return res.status(200).json({
+                statusCode: 200,
+                blogs,
+                message: 'Fetched from database'
+            });                                                     
         }
 
     
@@ -137,6 +140,7 @@ const getBlogs = async (req, res) => {
     }
 };
 
+// get latest blogs
 const getLatestBlogs=async (req,res)=>{
     try{
 
@@ -168,8 +172,7 @@ const getLatestBlogs=async (req,res)=>{
                 blogs,
                 message:"fetch latest from database"
             });
-
-
+            
     }catch(error){
         return res.status(500).json({
             statusCode: 500,
@@ -178,6 +181,7 @@ const getLatestBlogs=async (req,res)=>{
     }
 
 }
+
 //get blog by slug
 const getBlogBySlug=async (req,res)=>{
     try {
@@ -210,6 +214,7 @@ const updateBlog=async (req,res)=>{
         const blogId=req.params.blogId;
         const {title,category,content,status}=req.body;
 
+        // check input validation
         if(!title || !content){
             return res.status(400).json({
                  statusCode:400,
@@ -224,10 +229,10 @@ const updateBlog=async (req,res)=>{
                         .replace(/\s+/g, '-') // Replace spaces with dashes
                         .replace(/-+/g, '-'); // Replace multiple dashes with a single dash
         
-        
         const feature_image_local_path=req.file?.path;
         let feature_image;
 
+        // upload blog image on cloudinary
         if(feature_image_local_path){
             feature_image=await uploadOnCloudinary(feature_image_local_path);
             if(!feature_image){
@@ -238,7 +243,6 @@ const updateBlog=async (req,res)=>{
             }
         }
      
-
         const updatedBlog=await Blog.findByIdAndUpdate(blogId,{
            $set:{
             user_id:req.user._id,
@@ -251,6 +255,7 @@ const updateBlog=async (req,res)=>{
            } 
         },{new:true});
 
+        // clear all cache
         cache.flushAll();
 
         return res.status(200).json({
@@ -295,20 +300,24 @@ const likeBlog=async(req,res)=>{
       let blogId=req.params.blogId;
       let blog=await Blog.findById(blogId);
       const isLiked=blog.likes.indexOf(req.user._id)!==-1;
- 
+        
+        // liked post if not liked
         if(!isLiked){
           let blogs= await Blog.findByIdAndUpdate(blogId,{
                 $push:{likes:req.user._id}
             },
             {new:true}) 
+
             return res.status(200).json({
                 statusCode:200,
                 blogs
             })
         }
-       let blogs= await Blog.findByIdAndUpdate(blogId,{
-            $pull:{likes:req.user._id}
-        },{new:true})
+
+        // remove liked if liked
+        let blogs= await Blog.findByIdAndUpdate(blogId,{
+                $pull:{likes:req.user._id}
+            },{new:true})
 
         return res.status(200).json({
             statusCode:200,
@@ -332,25 +341,25 @@ const addComment=async (req,res)=>{
         commentedBy:req.user._id
        };
 
-      let blogId=req.params.blogId;
-
+       let blogId=req.params.blogId;
+      
+       // update comment value 
        let blogs= await Blog.findByIdAndUpdate(blogId,{
          $push:{comments:comment}
        },{new:true})
+
        return res.status(200).json({
         statusCode:200,
         blogs
        })
 
    } catch (error) {
-    return res.status(500).json({
-        statusCode:500,
-        message:error.message
-    })   
-   }
+        return res.status(500).json({
+            statusCode:500,
+            message:error.message
+        })   
+    }
 }
-
-
 
 export {createBlog,getBlogs,getBlogBySlug,updateBlog,deleteBlog,likeBlog,addComment,getLatestBlogs}
 

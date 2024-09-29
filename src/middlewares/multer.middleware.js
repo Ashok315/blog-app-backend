@@ -1,7 +1,6 @@
 import multer from "multer";
 import path from "path";
 
-
 const storage=multer.diskStorage({
     destination:function(req,file,cb){
         cb(null,"./public/temp")
@@ -28,9 +27,7 @@ const upload = multer({
       }
     },
 
-
   });
-
 
   const fileValidation = (err, req, res, next) => {
     if (err) {
@@ -43,8 +40,5 @@ const upload = multer({
     }
   }
   
-
-
-
 export {upload,fileValidation}
      
