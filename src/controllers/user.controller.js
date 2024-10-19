@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import { uploadOnCloudinary } from '../services/cloudinary.service.js';
 import { cache } from '../utils/cache.js';
+import { sendEmail } from '../utils/sendEmail.js';
 
 // sign-up user
 const registerUser=async (req,res)=>{
@@ -64,6 +65,7 @@ const registerUser=async (req,res)=>{
 const loginUser=async (req, res)=>{
     try {
         const {email,password}=req.body; 
+
         // check input validation
         if([email,password].some((field)=>field.trim()==="")){
             return res.status(400).json({
@@ -171,6 +173,95 @@ const getCurrentUser=async (req,res)=>{
     }
 }
 
+// forgot password
+const forgotPassword=async (req,res)=>{
+     try {
+        const {email}=req.body;
+        // check validation
+        if(!email||!email.trim()){
+            return res.status(400).json({
+                statusCode:400,
+                message:"Email is Required"
+            })
+        }
+        
+        // check exist user or not   
+        const existUser=await User.findOne({email});
+        if(!existUser){
+            return res.status(400).json({
+                statusCode:400,
+                message:"User does not existed"
+            })
+        }
+    
+        // verify email if user exist
+
+        let token=jwt.sign({id:existUser._id},process.env.ACCESS_TOKEN_SECRET_KEY,{expiresIn:"300s"})
+         
+        sendEmail(email,`${process.env.CLIENT_URI}/reset_password/${token}`);
+
+        return res.status(200).json({
+            statusCode:200,
+            message:"Reset link sent to your email",
+    })
+    
+        
+     } catch (error) {
+        return res.status(500).json({
+            statusCode:500,
+            message:error.message
+        })
+     }
+}
+
+// reset password
+const resetPassword=async(req,res)=>{
+
+    try {
+        const {token}=req.params;
+        const {newPassword}=req.body;
+ 
+        //verify token
+        const verifyToken=jwt.verify(token,process.env.ACCESS_TOKEN_SECRET_KEY);
+
+           //validate input
+           if(!newPassword){
+               return res.status(400).json({
+                   statusCode:400,
+                   message:"New Password is Required"
+               })
+           }
+       
+            const user=await User.findById(verifyToken.id);
+
+            if(!user){
+                return res.status(404).json({
+                    statusCode:404,
+                    message:"User does not found",
+                })
+            }
+
+            // Hash the new password and update the user's password    
+            user.password=await bcrypt.hash(newPassword,10);
+            
+            await user.save();
+
+            return res.status(200).json({
+                    statusCode:200,
+                    message:"Password changed successfully",
+            })
+        
+    } catch (error) {
+        return res.status(400).json({
+            statusCode:400,
+            message:"Link has been expired",
+            Error:error.message
+        })
+    }
+}
+  
+
+
 // update user profile data
 const updateProfile=async (req,res)=>{
     try{
@@ -255,4 +346,4 @@ const updateProfileImage=async(req,res)=>{
     }
 }
 
-export {registerUser,loginUser,logoutUser,getCurrentUser,updateProfile,updateProfileImage}
+export {registerUser,loginUser,logoutUser,getCurrentUser,updateProfile,updateProfileImage,forgotPassword,resetPassword}

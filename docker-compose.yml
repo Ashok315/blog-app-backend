@@ -11,6 +11,10 @@ services:
       PORT: 4000
       MONGODB_URI: mongodb://mongo_db:27017
       DB_NAME: blogdb
+      EMAIL_FROM: ashokpateliya315@gmail.com
+      EMAIL_PASSWORD: yrgm sxju zzix iehr
+      PROD_ORIGIN: http://34.100.181.167
+      CLIENT_URI: https://myblog.infogiri.com
       ACCESS_TOKEN_SECRET_KEY: blogwebappsecret
       ACCESS_TOKEN_EXPIRY: 1d  
       CLOUDINARY_CLOUD_NAME: webappbucket
