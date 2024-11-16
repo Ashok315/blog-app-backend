@@ -7,7 +7,7 @@ import { cache } from "../utils/cache.js";
 const createBlog=async (req,res)=>{
     try {    
         const {title,category,content,visibility}=req.body;
-
+        
         // check input validation
         if(!title || !content){
             return res.status(400).json({
@@ -37,6 +37,12 @@ const createBlog=async (req,res)=>{
                     message:"File was not uploaded"
                 })
             }
+        }
+        else{
+            return res.status(400).json({
+                statusCode:400,
+                message:"File was not uploaded"
+            })
         }
 
         const blog=new Blog({
@@ -212,8 +218,8 @@ const getBlogBySlug=async (req,res)=>{
 const updateBlog=async (req,res)=>{
     try {
         const blogId=req.params.blogId;
-        const {title,category,content,status}=req.body;
-
+        const {title,category,content,visibility}=req.body;
+        
         // check input validation
         if(!title || !content){
             return res.status(400).json({
@@ -231,7 +237,7 @@ const updateBlog=async (req,res)=>{
         
         const feature_image_local_path=req.file?.path;
         let feature_image;
-
+        
         // upload blog image on cloudinary
         if(feature_image_local_path){
             feature_image=await uploadOnCloudinary(feature_image_local_path);
@@ -242,6 +248,12 @@ const updateBlog=async (req,res)=>{
                 })
             }
         }
+        else{
+            return res.status(400).json({
+                statusCode:400,
+                message:"File was not uploaded"
+            })
+        }
      
         const updatedBlog=await Blog.findByIdAndUpdate(blogId,{
            $set:{
@@ -251,7 +263,7 @@ const updateBlog=async (req,res)=>{
             category,
             content,
             feature_image,
-            status
+            visibility
            } 
         },{new:true});
 
